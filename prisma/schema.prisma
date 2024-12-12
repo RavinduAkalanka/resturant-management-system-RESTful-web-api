@@ -1,0 +1,352 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//ENUM
+enum Role {
+  ADMIN
+  OWNER
+  MANAGER
+  ASSISTANT
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  NOPAY
+  SHORT
+  HALFDAY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum InventoryRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ManagerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  name     String
+  role     Role
+  email    String @unique
+  password String
+
+  owner   Owner?
+  manager Manager?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Owner {
+  id          Int     @id @default(autoincrement())
+  brNo        String  @unique @map("br_no")
+  companyName String  @map("company_name")
+  userId      Int     @unique @map("user_id")
+  address     String?
+  url         String
+  contactNo   String  @unique @map("contact_no")
+
+  user              User               @relation(fields: [userId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient        Ingredient[]
+  dishe             Dish[]
+  outlets           Outlet[]
+  menus             Menu[]
+  employees         Employee[]
+  supplier          Supplier[]
+  supplierOrders    SupplierOrder[]
+  leaveRequests     LeaveRequest[]
+  inventoryRequests InventoryRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Manager {
+  id         Int           @id @default(autoincrement())
+  status     ManagerStatus @default(ACTIVE)
+  userId     Int           @unique @map("user_id")
+  outletId   Int           @unique @map("outlet_id")
+  employeeId Int           @unique @map("employee_id")
+
+  employee         Employee           @relation(fields: [employeeId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  outlet           Outlet             @relation(fields: [outletId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  user             User               @relation(fields: [userId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  leaveRequest     LeaveRequest[]
+  inventoryRequest InventoryRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Outlet {
+  id       Int    @id @default(autoincrement())
+  location String
+  ownerId  Int    @map("owner_id")
+  menuId   Int?   @map("menu_id")
+
+  owner     Owner      @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  manager   Manager?
+  employees Employee[]
+  inventory Inventory?
+  menu      Menu?      @relation(fields: [menuId], references: [id]) // Adding the relation to Menu
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Inventory {
+  id       Int @id @default(autoincrement())
+  outletId Int @unique @map("outlet_id")
+
+  outlet               Outlet                @relation(fields: [outletId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  inventoryIngredients InventoryIngredient[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Ingredient {
+  id      Int    @id @default(autoincrement())
+  name    String 
+  unit    String
+  price   Float
+  url         String
+  ownerId Int
+
+  owner                   Owner                     @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  dishIngredients         DishIngredient[]
+  inventoryIngredients    InventoryIngredient[]
+  supplierIngredients     SupplierIngredient[]
+  requestIngredients      RequestIngredient[]
+  supplierOrderIngredient SupplierOrderIngredient[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerId,name])
+}
+
+model InventoryIngredient {
+  id           Int   @id @default(autoincrement())
+  inventoryId  Int   @map("inventory_id")
+  ingredientId Int   @map("ingredient_id")
+  quantity     Float
+
+  inventory  Inventory  @relation(fields: [inventoryId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id],onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([inventoryId, ingredientId])
+}
+
+model Dish {
+  id             Int    @id @default(autoincrement())
+  name           String 
+  price          Float
+  url            String
+  estimatedCount Int    @map("estimated_count")
+  ownerId        Int
+
+  owner           Owner            @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  dishIngredients DishIngredient[]
+  menuDishes      MenuDish[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerId,name])
+}
+
+model DishIngredient {
+  id           Int   @id @default(autoincrement())
+  dishId       Int   @map("dish_id")
+  ingredientId Int   @map("ingredient_id")
+  quantity     Float
+
+  dish       Dish       @relation(fields: [dishId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id],onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([dishId, ingredientId])
+}
+
+model Menu {
+  id      Int    @id @default(autoincrement())
+  name    String 
+  ownerId Int    @map("owner_id")
+
+  owner      Owner      @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  menuDishes MenuDish[]
+  outlets    Outlet[]
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@unique([ownerId, name])
+}
+
+model MenuDish {
+  id     Int @id @default(autoincrement())
+  menuId Int @map("menu_id")
+  dishId Int @map("dish_id")
+
+  menu Menu @relation(fields: [menuId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  dish Dish @relation(fields: [dishId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([menuId, dishId])
+}
+
+model Employee {
+  id          Int     @id @default(autoincrement())
+  name        String
+  nicNo       String  @unique @map("nic_no")
+  address     String
+  contactNo   String  @map("contact_no")
+  emgConNo    String  @map("emg_con_no")
+  emgConName  String  @map("emg_con_name")
+  designation String
+  isCritical  Boolean @map("is_critical")
+  salary      Float
+  url         String
+  ownerId     Int     @map("owner_id")
+  outletId    Int     @map("outlet_id")
+
+  leaverequest LeaveRequest[]
+  manager      Manager?
+  owner        Owner          @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  outlet       Outlet         @relation(fields: [outletId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Supplier {
+  id        Int    @id @default(autoincrement())
+  name      String
+  email     String @unique
+  address   String
+  contactNo String @unique @map("contact_no")
+  ownerId   Int    @map("owner_id")
+
+  supplierIngredients SupplierIngredient[]
+  supplierOrders      SupplierOrder[]
+  owner               Owner                @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+}
+
+model SupplierIngredient {
+  id           Int @id @default(autoincrement())
+  supplierId   Int @map("supplier_id")
+  ingredientId Int @map("ingredient_id")
+
+  supplier   Supplier   @relation(fields: [supplierId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id],onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([supplierId, ingredientId])
+}
+
+model SupplierOrder {
+  id         Int      @id @default(autoincrement())
+  totalValue Float    @map("total_value")
+  supplierId Int      @map("supplier_id")
+  ownerId    Int      @map("owner_id")
+
+  supplier    Supplier                  @relation(fields: [supplierId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  owner       Owner                     @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  supplierOrderIngredient SupplierOrderIngredient[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model LeaveRequest {
+  id         Int         @id @default(autoincrement())
+  type       LeaveType
+  from       DateTime
+  noOfDate   Int         @map("no_of_date")
+  reason     String
+  status     LeaveStatus
+  employeeId Int         @map("employee_id")
+  managerId  Int         @map("manager_id")
+  ownerId    Int         @map("owner_id")
+
+  employee Employee @relation(fields: [employeeId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  owner    Owner    @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  manager  Manager  @relation(fields: [managerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model InventoryRequest {
+  id        Int                    @id @default(autoincrement())
+  ownerId   Int                    @map("owner_id")
+  managerId Int                    @map("manager_id")
+  status    InventoryRequestStatus
+
+  requestIngredients RequestIngredient[]
+  owner              Owner               @relation(fields: [ownerId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  manager            Manager             @relation(fields: [managerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model RequestIngredient {
+  id                 Int   @id @default(autoincrement())
+  inventoryRequestId Int   @map("inventory_request_id")
+  ingredientId       Int   @map("ingredient_id")
+  quantity           Float
+
+  inventoryRequest InventoryRequest @relation(fields: [inventoryRequestId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id],onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([inventoryRequestId, ingredientId])
+}
+
+model SupplierOrderIngredient {
+  id              Int @id @default(autoincrement())
+  supplierOrderId Int @map("supplier_order_id")
+  ingredientId    Int @map("ingredient_id")
+  quantity        Float
+
+  supplierOrder SupplierOrder @relation(fields: [supplierOrderId], references: [id],onDelete: Cascade,onUpdate: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id],onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([supplierOrderId, ingredientId])
+}
